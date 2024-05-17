@@ -55,7 +55,7 @@ class PrivateManufacturerViewsTest(TestCase):
         number_of_manufacturers = 24
         for i in range(number_of_manufacturers):
             Manufacturer.objects.create(
-                name=f'test_manufacturer{i}',
+                name=f"test_manufacturer{i}",
                 country=f"test_country{i}",
             )
 
