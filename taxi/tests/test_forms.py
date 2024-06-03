@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.forms import CheckboxSelectMultiple
 from django.test import TestCase
+from django.urls import reverse
 
 from taxi.forms import (
     ManufacturerSearchForm,
@@ -10,7 +11,7 @@ from taxi.forms import (
     DriverLicenseUpdateForm,
     DriverSearchForm,
 )
-from taxi.models import Manufacturer
+from taxi.models import Manufacturer, Driver
 
 
 class ManufacturerFormsTest(TestCase):
@@ -89,6 +90,12 @@ class CarFormsTest(TestCase):
 
 class DriverFormsTest(TestCase):
     def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="user1",
+            password="password",
+            license_number="ASD12345"
+        )
+        self.client.force_login(self.user)
         self.creation_form_data = {
             "username": "user1_username",
             "first_name": "user1_fname",
@@ -103,34 +110,67 @@ class DriverFormsTest(TestCase):
         self.search_form_data = {
             "username": "user1_username",
         }
-        self.invalid_license_numbers = [
-            "QWE1234",
-            "qWE12345",
-            "QWE1234r",
-            "QW123456"
-        ]
 
     def test_driver_creation_form(self):
         form = DriverCreationForm(data=self.creation_form_data)
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data, self.creation_form_data)
 
-    def test_driver_creation_form_with_invalid_license_number(self):
-        for invalid_license_number in self.invalid_license_numbers:
-            self.creation_form_data["license_number"] = invalid_license_number
-            form = DriverCreationForm(data=self.creation_form_data)
-            self.assertFalse(form.is_valid())
+    def test_create_driver(self):
+        form = DriverCreationForm(data=self.creation_form_data)
+        self.assertTrue(form.is_valid())
+        self.client.post(reverse("taxi:driver-create"), data=form.cleaned_data)
+        driver = Driver.objects.filter(is_staff=False).first()
+        self.assertEqual(Driver.objects.count(), 2)
+        self.assertEqual(driver.username, "user1_username")
+
+    def test_update_driver_license_number(self):
+        update_form = DriverLicenseUpdateForm(
+            data={"license_number": "ABC54321"}
+        )
+        self.client.post(
+            reverse("taxi:driver-update", kwargs={"pk": self.user.pk}),
+            data=update_form.data
+        )
+        user = get_user_model().objects.get(pk=self.user.pk)
+        self.assertEqual(user.license_number, "ABC54321")
+
+    def test_form_license_invalid_length(self):
+        self.creation_form_data["license_number"] = "QWE1234"
+        self.license_form_data["license_number"] = "QWE1234"
+        creation_form = DriverCreationForm(data=self.creation_form_data)
+        update_form = DriverLicenseUpdateForm(data=self.license_form_data)
+        self.assertFalse(creation_form.is_valid())
+        self.assertFalse(update_form.is_valid())
+
+    def test_form_license_invalid_letters_register(self):
+        self.creation_form_data["license_number"] = "qwe12345"
+        self.license_form_data["license_number"] = "qwe12345"
+        creation_form = DriverCreationForm(data=self.creation_form_data)
+        update_form = DriverLicenseUpdateForm(data=self.license_form_data)
+        self.assertFalse(creation_form.is_valid())
+        self.assertFalse(update_form.is_valid())
+
+    def test_form_license_last_five_characters_not_numeric(self):
+        self.creation_form_data["license_number"] = "QWE1234r"
+        self.license_form_data["license_number"] = "QWE1234r"
+        creation_form = DriverCreationForm(data=self.creation_form_data)
+        update_form = DriverLicenseUpdateForm(data=self.license_form_data)
+        self.assertFalse(creation_form.is_valid())
+        self.assertFalse(update_form.is_valid())
+
+    def test_form_license_first_three_characters_not_alphabetic(self):
+        self.creation_form_data["license_number"] = "QW123456"
+        self.license_form_data["license_number"] = "QW123456"
+        creation_form = DriverCreationForm(data=self.creation_form_data)
+        update_form = DriverLicenseUpdateForm(data=self.license_form_data)
+        self.assertFalse(creation_form.is_valid())
+        self.assertFalse(update_form.is_valid())
 
     def test_driver_license_update_form(self):
         form = DriverLicenseUpdateForm(data=self.license_form_data)
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data, self.license_form_data)
-
-    def test_driver_license_update_form_with_invalid_license_number(self):
-        for invalid_license_number in self.invalid_license_numbers:
-            self.license_form_data["license_number"] = invalid_license_number
-            form = DriverLicenseUpdateForm(data=self.license_form_data)
-            self.assertFalse(form.is_valid())
 
     def test_driver_search_form(self):
         form = DriverSearchForm(data=self.search_form_data)

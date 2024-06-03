@@ -16,16 +16,34 @@ USER_DATA = {
 
 class PublicViewsTest(TestCase):
     def test_redirect_if_not_logged_in(self):
-        paths = [
-            "/",
-            "/cars/",
-            "/drivers/",
-            "/manufacturers/",
-        ]
-        for path in paths:
-            response = self.client.get(path)
-            self.assertEqual(response.status_code, 302)
-            self.assertRedirects(response, f"/accounts/login/?next={path}")
+        index_path = reverse("taxi:index")
+        car_list_path = reverse("taxi:car-list")
+        driver_list_path = reverse("taxi:driver-list")
+        manufacturer_list_path = reverse("taxi:manufacturer-list")
+        index_response = self.client.get(index_path)
+        car_list_response = self.client.get(car_list_path)
+        driver_list_response = self.client.get(driver_list_path)
+        manufacturer_list_response = self.client.get(manufacturer_list_path)
+        self.assertEqual(index_response.status_code, 302)
+        self.assertEqual(car_list_response.status_code, 302)
+        self.assertEqual(driver_list_response.status_code, 302)
+        self.assertEqual(manufacturer_list_response.status_code, 302)
+        self.assertRedirects(
+            index_response,
+            f"{reverse('login')}?next={index_path}"
+        )
+        (self.assertRedirects(
+            car_list_response,
+            f"{reverse('login')}?next={car_list_path}")
+         )
+        self.assertRedirects(
+            driver_list_response,
+            f"{reverse('login')}?next={driver_list_path}"
+        )
+        self.assertRedirects(
+            manufacturer_list_response,
+            f"{reverse('login')}?next={manufacturer_list_path}"
+        )
 
 
 class UserAuthTest(TestCase):
